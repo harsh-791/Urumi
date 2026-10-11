@@ -1,0 +1,9 @@
+{
+  "name": "urumi",
+  "private": true,
+  "scripts": {
+    "build": "npm run build --prefix apps/gateway && npm run build --prefix apps/woo-mcp && npm run build --prefix apps/notes-mcp && npm run build --prefix apps/clock-mcp && npm run build --prefix apps/dashboard",
+    "test": "npm test --prefix apps/gateway",
+    "secrets": "scripts/gen-secrets.sh"
+  }
+}

@@ -1,0 +1,59 @@
+# Local kind cluster. Hosts resolve through sslip.io to 127.0.0.1.
+# Secrets come from secrets.local.yaml, which is gitignored.
+store:
+  storageClass: standard
+  wordpress:
+    image: wordpress:7.1-php8.3-apache
+    cliImage: wordpress:cli-2.12-php8.3
+    url: http://store.127.0.0.1.sslip.io
+    title: Urumi Goods
+    adminUser: admin
+    adminEmail: admin@urumi.local
+  mariadb:
+    image: mariadb:11.4
+  wooMcp:
+    repository: urumi-woo-mcp
+    tag: local
+    pullPolicy: IfNotPresent
+  ingress:
+    className: nginx
+    host: store.127.0.0.1.sslip.io
+    controllerNamespace: ingress-nginx
+    controllerLabelKey: app.kubernetes.io/name
+    controllerLabelValue: ingress-nginx
+    tls: false
+  networkPolicy: true
+
+platform:
+  storageClass: standard
+  publicUrl: http://app.127.0.0.1.sslip.io
+  cookieSecure: false
+  allowClusterUrls: true
+  openaiModel: gpt-4o-mini
+  adminEmail: admin@urumi.local
+  ingress:
+    className: nginx
+    host: app.127.0.0.1.sslip.io
+    controllerNamespace: ingress-nginx
+    controllerLabelKey: app.kubernetes.io/name
+    controllerLabelValue: ingress-nginx
+    tls: false
+  postgres:
+    image: postgres:16-alpine
+  gateway:
+    repository: urumi-gateway
+    tag: local
+    pullPolicy: IfNotPresent
+  dashboard:
+    repository: urumi-dashboard
+    tag: local
+    pullPolicy: IfNotPresent
+  notesMcp:
+    repository: urumi-notes-mcp
+    tag: local
+    pullPolicy: IfNotPresent
+  clockMcp:
+    repository: urumi-clock-mcp
+    tag: local
+    pullPolicy: IfNotPresent
+  networkPolicy: true

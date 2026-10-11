@@ -1,0 +1,46 @@
+storageClass: standard
+publicUrl: http://app.127.0.0.1.sslip.io
+cookieSecure: false
+allowClusterUrls: true
+openaiModel: gpt-4o-mini
+ingress:
+  className: nginx
+  host: app.127.0.0.1.sslip.io
+  controllerNamespace: ingress-nginx
+  controllerLabelKey: app.kubernetes.io/name
+  controllerLabelValue: ingress-nginx
+  tls: false
+  tlsSecret: gateway-tls
+postgres:
+  image: postgres:16-alpine
+gateway:
+  repository: urumi-gateway
+  tag: local
+  pullPolicy: IfNotPresent
+dashboard:
+  repository: urumi-dashboard
+  tag: local
+  pullPolicy: IfNotPresent
+notesMcp:
+  repository: urumi-notes-mcp
+  tag: local
+  pullPolicy: IfNotPresent
+clockMcp:
+  repository: urumi-clock-mcp
+  tag: local
+  pullPolicy: IfNotPresent
+networkPolicy: true
+adminEmail: admin@urumi.local
+secrets:
+  create: false
+  name: platform-secrets
+  dbPassword: ""
+  adminPassword: ""
+  credentialKey: ""
+  openaiApiKey: ""
+  wooMcpToken: ""
+  notesMcpToken: ""
+  clockMcpToken: ""
+persistence:
+  postgres: 2Gi
+  notes: 1Gi

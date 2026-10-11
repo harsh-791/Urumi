@@ -1,0 +1,62 @@
+# Production-like k3s. Same charts as local. This file is the diff:
+# public hostnames, local-path storage, a registry for images, TLS knobs.
+# Create the Kubernetes Secrets out of band. Do not put secret values here.
+store:
+  storageClass: local-path
+  wordpress:
+    image: wordpress:7.1-php8.3-apache
+    cliImage: wordpress:cli-2.12-php8.3
+    url: https://store.example.com
+    title: Urumi Goods
+    adminUser: admin
+    adminEmail: admin@urumi.local
+  mariadb:
+    image: mariadb:11.4
+  wooMcp:
+    repository: ghcr.io/OWNER/urumi-woo-mcp
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  ingress:
+    className: nginx
+    host: store.example.com
+    controllerNamespace: ingress-nginx
+    controllerLabelKey: app.kubernetes.io/name
+    controllerLabelValue: ingress-nginx
+    tls: true
+    tlsSecret: store-tls
+  networkPolicy: true
+
+platform:
+  storageClass: local-path
+  publicUrl: https://app.example.com
+  cookieSecure: true
+  allowClusterUrls: true
+  openaiModel: gpt-4o-mini
+  adminEmail: admin@urumi.local
+  ingress:
+    className: nginx
+    host: app.example.com
+    controllerNamespace: ingress-nginx
+    controllerLabelKey: app.kubernetes.io/name
+    controllerLabelValue: ingress-nginx
+    tls: true
+    tlsSecret: gateway-tls
+  postgres:
+    image: postgres:16-alpine
+  gateway:
+    repository: ghcr.io/OWNER/urumi-gateway
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  dashboard:
+    repository: ghcr.io/OWNER/urumi-dashboard
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  notesMcp:
+    repository: ghcr.io/OWNER/urumi-notes-mcp
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  clockMcp:
+    repository: ghcr.io/OWNER/urumi-clock-mcp
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  networkPolicy: true

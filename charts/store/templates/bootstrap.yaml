@@ -1,0 +1,210 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: woo-bootstrap
+  labels:
+    {{- include "store.labels" . | nindent 4 }}
+data:
+  bootstrap.sh: |
+    #!/bin/sh
+    set -eu
+    export HOME=/tmp
+    export WP_CLI_CACHE_DIR=/tmp/wp-cli
+    mkdir -p "$WP_CLI_CACHE_DIR"
+    i=0
+    while [ ! -f /var/www/html/wp-config.php ] || [ ! -f /var/www/html/wp-includes/version.php ]; do
+      i=$((i + 1))
+      if [ "$i" -gt 60 ]; then
+        echo "timed out waiting for WordPress files"
+        exit 1
+      fi
+      sleep 5
+    done
+    i=0
+    until wp db check --path=/var/www/html >/tmp/db-check.err 2>&1; do
+      i=$((i + 1))
+      if [ "$i" -gt 60 ]; then
+        echo "timed out waiting for the database"
+        cat /tmp/db-check.err
+        exit 1
+      fi
+      sleep 5
+    done
+    current=$(wp core version --path=/var/www/html)
+    if [ "$current" != "$WP_CORE_VERSION" ]; then
+      wp core update --path=/var/www/html --version="$WP_CORE_VERSION" --force
+    fi
+    if ! wp core is-installed --path=/var/www/html; then
+      wp core install \
+        --path=/var/www/html \
+        --url="$WP_URL" \
+        --title="$WP_TITLE" \
+        --admin_user="$WP_ADMIN_USER" \
+        --admin_password="$WP_ADMIN_PASSWORD" \
+        --admin_email="$WP_ADMIN_EMAIL" \
+        --skip-email
+    fi
+    wp core update-db --path=/var/www/html
+    wp option update siteurl "$WP_URL" --path=/var/www/html
+    wp option update home "$WP_URL" --path=/var/www/html
+    wp rewrite structure '/%postname%/' --path=/var/www/html
+    if ! wp plugin is-installed woocommerce --path=/var/www/html; then
+      wp plugin install woocommerce --version="$WC_VERSION" --activate --path=/var/www/html
+    else
+      wp plugin activate woocommerce --path=/var/www/html
+    fi
+    wp eval 'if (class_exists("WC_Install")) { WC_Install::install(); WC_Install::create_pages(); }' --path=/var/www/html
+    wp option update woocommerce_coming_soon no --path=/var/www/html || true
+    wp option update woocommerce_store_pages_only no --path=/var/www/html || true
+    wp option update woocommerce_enable_guest_checkout yes --path=/var/www/html
+    wp option update woocommerce_currency USD --path=/var/www/html
+    wp option update woocommerce_default_country "US:CA" --path=/var/www/html
+    wp option update woocommerce_cod_settings '{"enabled":"yes","title":"Cash on delivery","description":"Pay with cash upon delivery.","instructions":"Pay with cash upon delivery.","enable_for_methods":[],"enable_for_virtual":"yes"}' --format=json --path=/var/www/html
+    wp eval-file /scripts/install-keys.php --path=/var/www/html
+    wp eval-file /scripts/sample-product.php --path=/var/www/html
+    wp rewrite flush --path=/var/www/html
+    echo "bootstrap complete"
+  install-keys.php: |
+    <?php
+    global $wpdb;
+    $key = getenv('WC_CONSUMER_KEY');
+    $secret = getenv('WC_CONSUMER_SECRET');
+    if (!$key || !$secret) {
+        fwrite(STDERR, "missing consumer key\n");
+        exit(1);
+    }
+    $table = $wpdb->prefix . 'woocommerce_api_keys';
+    $hash = hash_hmac('sha256', $key, 'wc-api');
+    $exists = $wpdb->get_var($wpdb->prepare("SELECT key_id FROM {$table} WHERE consumer_key = %s", $hash));
+    if ($exists) {
+        echo "api key present\n";
+        return;
+    }
+    $user = get_user_by('login', getenv('WP_ADMIN_USER'));
+    if (!$user) {
+        fwrite(STDERR, "admin user missing\n");
+        exit(1);
+    }
+    $wpdb->insert($table, array(
+        'user_id' => $user->ID,
+        'description' => 'urumi mcp',
+        'permissions' => 'read_write',
+        'consumer_key' => $hash,
+        'consumer_secret' => $secret,
+        'truncated_key' => substr($key, -7),
+    ));
+    echo "api key inserted\n";
+  sample-product.php: |
+    <?php
+    if (!function_exists('wc_get_products')) {
+        fwrite(STDERR, "woocommerce not loaded\n");
+        exit(1);
+    }
+    $existing = wc_get_products(array('limit' => 1, 'status' => 'publish', 'return' => 'ids'));
+    if (!empty($existing)) {
+        echo "products already exist\n";
+        return;
+    }
+    $product = new WC_Product_Simple();
+    $product->set_name('Brass lamp');
+    $product->set_regular_price('48');
+    $product->set_description('A small lamp for the demo store.');
+    $product->set_status('publish');
+    $product->set_catalog_visibility('visible');
+    $product->set_stock_status('instock');
+    $product->save();
+    echo "sample product created\n";
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: woo-bootstrap
+  labels:
+    {{- include "store.labels" . | nindent 4 }}
+    app.kubernetes.io/name: woo-bootstrap
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "5"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 900
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: woo-bootstrap
+        app.kubernetes.io/part-of: urumi
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsUser: 33
+        runAsGroup: 33
+        fsGroup: 33
+      containers:
+        - name: bootstrap
+          image: {{ .Values.wordpress.cliImage }}
+          command: ["sh", "/scripts/bootstrap.sh"]
+          env:
+            - name: WORDPRESS_DB_HOST
+              value: mariadb
+            - name: WORDPRESS_DB_USER
+              value: wordpress
+            - name: WORDPRESS_DB_NAME
+              value: wordpress
+            - name: WORDPRESS_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.name }}
+                  key: db-password
+            - name: WP_CORE_VERSION
+              value: {{ .Values.wordpress.coreVersion | quote }}
+            - name: WC_VERSION
+              value: {{ .Values.wordpress.woocommerceVersion | quote }}
+            - name: WP_URL
+              value: {{ .Values.wordpress.url | quote }}
+            - name: WP_TITLE
+              value: {{ .Values.wordpress.title | quote }}
+            - name: WP_ADMIN_USER
+              value: {{ .Values.wordpress.adminUser | quote }}
+            - name: WP_ADMIN_EMAIL
+              value: {{ .Values.wordpress.adminEmail | quote }}
+            - name: WP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.name }}
+                  key: wp-admin-password
+            - name: WC_CONSUMER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.name }}
+                  key: wc-consumer-key
+            - name: WC_CONSUMER_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.name }}
+                  key: wc-consumer-secret
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: wordpress
+              mountPath: /var/www/html
+            - name: scripts
+              mountPath: /scripts
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: wordpress
+          persistentVolumeClaim:
+            claimName: wordpress
+        - name: scripts
+          configMap:
+            name: woo-bootstrap
+        - name: tmp
+          emptyDir: {}

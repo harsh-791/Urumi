@@ -1,0 +1,6 @@
+apiVersion: v2
+name: store
+description: WooCommerce store and its private MCP server
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
