@@ -78,6 +78,10 @@ spec:
                   key: openai-api-key
             - name: OPENAI_MODEL
               value: {{ .Values.openaiModel | quote }}
+            {{- if .Values.openaiBaseUrl }}
+            - name: OPENAI_BASE_URL
+              value: {{ .Values.openaiBaseUrl | quote }}
+            {{- end }}
             - name: COOKIE_SECURE
               value: {{ .Values.cookieSecure | quote }}
             - name: ALLOW_CLUSTER_URLS

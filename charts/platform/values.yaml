@@ -3,6 +3,7 @@ publicUrl: http://app.127.0.0.1.sslip.io
 cookieSecure: false
 allowClusterUrls: true
 openaiModel: gpt-4o-mini
+openaiBaseUrl: ""
 ingress:
   className: nginx
   host: app.127.0.0.1.sslip.io

@@ -29,7 +29,8 @@ platform:
   publicUrl: http://app.127.0.0.1.sslip.io
   cookieSecure: false
   allowClusterUrls: true
-  openaiModel: gpt-4o-mini
+  openaiModel: gemini-3.5-flash
+  openaiBaseUrl: https://generativelanguage.googleapis.com/v1beta/openai/
   adminEmail: admin@urumi.local
   ingress:
     className: nginx
