@@ -4,6 +4,7 @@ import type { User } from "./api";
 import { Shell } from "./Shell";
 import { AuditPage } from "./pages/Audit";
 import { ChatPage } from "./pages/Chat";
+import { ConsentPage } from "./pages/Consent";
 import { KeysPage } from "./pages/Keys";
 import { LoginPage } from "./pages/Login";
 import { ServersPage } from "./pages/Servers";
@@ -16,6 +17,7 @@ export function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/oauth/consent" element={<ConsentPage />} />
       <Route element={<Shell />}>
         <Route path="/" element={<Navigate to="/servers" replace />} />
         <Route path="/servers" element={<ServersPage />} />

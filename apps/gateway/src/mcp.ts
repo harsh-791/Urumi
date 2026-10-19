@@ -6,6 +6,7 @@ import { CallToolRequestSchema, isInitializeRequest, ListToolsRequestSchema } fr
 import { writeAudit } from "./audit.js";
 import { hashApiKey } from "./crypto.js";
 import { pool, type UserRow } from "./db.js";
+import { userIdForAccessToken } from "./oauth.js";
 import { callGatewayTool, visibleTools } from "./upstream.js";
 
 type Session = { transport: StreamableHTTPServerTransport; userId: string };
@@ -17,6 +18,11 @@ async function userFromBearer(header: string | undefined): Promise<BearerUser | 
   if (!header?.startsWith("Bearer ")) return null;
   const token = header.slice("Bearer ".length).trim();
   if (!token) return null;
+  if (token.startsWith("uro_")) {
+    const userId = await userIdForAccessToken(token);
+    if (!userId) return null;
+    return reloadUser(userId);
+  }
   const result = await pool.query<UserRow>(
     `SELECT users.* FROM api_keys
      JOIN users ON users.id = api_keys.user_id

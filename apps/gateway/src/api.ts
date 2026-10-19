@@ -8,6 +8,7 @@ import { assertUrlAllowed, SsrfError } from "./ssrf.js";
 import { toolAllowed, validSlug } from "./tools.js";
 import { listUpstreamTools, probeServers } from "./upstream.js";
 import { runChat, type ChatMessage } from "./chat.js";
+import { decideAuthorization, describeRequest, requireOAuthStore } from "./oauth.js";
 
 const COOKIE = "urumi_session";
 const SESSION_MS = 7 * 24 * 60 * 60 * 1000;
@@ -303,6 +304,22 @@ export async function listAudit(req: Request, res: Response): Promise<void> {
     [user.role, user.id],
   );
   res.json({ events: result.rows });
+}
+
+export async function oauthRequest(req: Request, res: Response): Promise<void> {
+  requireUser(req);
+  const described = await describeRequest(requireOAuthStore(), String(req.params.id ?? ""));
+  res.json(described);
+}
+
+export async function oauthDecision(req: Request, res: Response): Promise<void> {
+  const user = requireUser(req);
+  const redirect = await decideAuthorization(requireOAuthStore(), {
+    requestId: String(req.body?.requestId ?? ""),
+    userId: user.id,
+    allow: req.body?.allow === true,
+  });
+  res.json({ redirect });
 }
 
 export async function chat(req: Request, res: Response): Promise<void> {

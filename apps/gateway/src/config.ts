@@ -27,6 +27,7 @@ export const config = {
   openaiApiKey: process.env.OPENAI_API_KEY ?? "",
   openaiModel: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
   openaiBaseUrl: process.env.OPENAI_BASE_URL || undefined,
+  publicUrl: (process.env.PUBLIC_URL ?? "").replace(/\/$/, ""),
   cookieSecure: process.env.COOKIE_SECURE === "true",
   allowClusterUrls: process.env.ALLOW_CLUSTER_URLS !== "false",
   listTimeoutMs: Number(process.env.LIST_TIMEOUT_MS ?? 3000),

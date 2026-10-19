@@ -108,6 +108,41 @@ spec:
                 name: gateway
                 port:
                   name: http
+          - path: /authorize
+            pathType: Prefix
+            backend:
+              service:
+                name: gateway
+                port:
+                  name: http
+          - path: /token
+            pathType: Prefix
+            backend:
+              service:
+                name: gateway
+                port:
+                  name: http
+          - path: /register
+            pathType: Prefix
+            backend:
+              service:
+                name: gateway
+                port:
+                  name: http
+          - path: /revoke
+            pathType: Prefix
+            backend:
+              service:
+                name: gateway
+                port:
+                  name: http
+          - path: /.well-known
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: gateway
+                port:
+                  name: http
           - path: /
             pathType: Prefix
             backend:

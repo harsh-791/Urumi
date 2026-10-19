@@ -46,6 +46,12 @@ Each store's NetworkPolicy only allows its own WooCommerce MCP pod to reach its 
 
 The provisioner is the only workload with a service account token. Its ClusterRole can manage the namespaced resources the store chart installs, not the whole cluster API.
 
+## MCP client sign-in
+
+An external client can still send `Authorization: Bearer urk_...`. It can also use OAuth: the gateway is the authorization server at the dashboard host. `GET /authorize` stores the PKCE request and redirects to `/oauth/consent`. The signed-in user allows or denies it. Allow issues a one-time code, and `POST /token` exchanges that code for an `uro_` access token bound to that user. The token is stored as a hash. The client bearer is still not forwarded to upstream MCP servers.
+
+Local `publicUrl` is `http://`, so the chart sets `MCP_DANGEROUSLY_ALLOW_INSECURE_ISSUER_URL` only in that case. Production `publicUrl` is `https://` and does not set the flag.
+
 ## What this does not do yet
 
-OAuth for MCP clients, deploying an MCP server from a container image, and more than one gateway replica are not built.
+Deploying an MCP server from a container image, more than one gateway replica, and a tool-search layer are not built.

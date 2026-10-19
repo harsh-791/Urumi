@@ -97,6 +97,12 @@ export const api = {
     request("/api/stores", { method: "POST", body: JSON.stringify(input) }),
   retryStore: (id: string) => request(`/api/stores/${id}/retry`, { method: "POST" }),
   deleteStore: (id: string) => request(`/api/stores/${id}`, { method: "DELETE" }),
+  oauthRequest: (id: string) => request<{ clientName: string; scopes: string[] }>(`/api/oauth/requests/${encodeURIComponent(id)}`),
+  oauthDecision: (requestId: string, allow: boolean) =>
+    request<{ redirect: string }>("/api/oauth/decision", {
+      method: "POST",
+      body: JSON.stringify({ requestId, allow }),
+    }),
   chat: (messages: { role: "user" | "assistant"; content: string }[]) =>
     request<{ message: string; toolCalls: ChatToolTrace[] }>("/api/chat", {
       method: "POST",

@@ -100,6 +100,8 @@ Cursor, or any client that speaks Streamable HTTP:
 
 User B should see tools from every enabled server except the two WooCommerce writes. A prompt that needs two servers: "What orders came in today, and save a one-line note summarizing them?" That uses `woo__list_orders` and `notes__create_note`.
 
+The same URL also accepts OAuth. Leave the header off and let the client discover `/.well-known/oauth-protected-resource/mcp`. It redirects to the dashboard, you sign in, and Allow issues a token for that user. API keys keep working.
+
 Then, as the admin:
 
 - Revoke user B's key. The next MCP call is unauthorized.
@@ -179,5 +181,6 @@ Implemented and where to look:
 - Upstream credentials encrypted at rest: `apps/gateway/src/crypto.ts`
 - Prod values, TLS flags, and rollback notes: `values-prod.yaml` and `docs/system-design.md`
 - Multi-store provisioning: dashboard **Stores**, provisioner in `charts/platform/templates/provisioner.yaml`, reconcile loop in `apps/gateway/src/provision.ts`. See the system design note.
+- OAuth for MCP clients: `apps/gateway/src/oauth.ts` and the dashboard consent page at `/oauth/consent`. API keys still work.
 
-Not implemented: OAuth, hosted MCP servers from an image, multiple gateway replicas, and a tool-search layer. The session limit is described in the design note.
+Not implemented: hosted MCP servers from an image, multiple gateway replicas, and a tool-search layer. The session limit is described in the design note.

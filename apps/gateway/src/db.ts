@@ -95,6 +95,48 @@ CREATE TABLE IF NOT EXISTS audit_log (
 CREATE INDEX IF NOT EXISTS audit_log_started_at_idx ON audit_log (started_at DESC);
 CREATE INDEX IF NOT EXISTS api_keys_hash_idx ON api_keys (key_hash);
 
+CREATE TABLE IF NOT EXISTS oauth_clients (
+  client_id TEXT PRIMARY KEY,
+  secret_ciphertext TEXT,
+  document TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS oauth_requests (
+  id TEXT PRIMARY KEY,
+  client_id TEXT NOT NULL,
+  client_name TEXT,
+  redirect_uri TEXT NOT NULL,
+  code_challenge TEXT NOT NULL,
+  state TEXT,
+  scopes TEXT NOT NULL,
+  resource TEXT,
+  expires_at TIMESTAMPTZ NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS oauth_codes (
+  code_hash TEXT PRIMARY KEY,
+  client_id TEXT NOT NULL,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  redirect_uri TEXT NOT NULL,
+  code_challenge TEXT NOT NULL,
+  scopes TEXT NOT NULL,
+  resource TEXT,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used_at TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS oauth_tokens (
+  token_hash TEXT PRIMARY KEY,
+  kind TEXT NOT NULL CHECK (kind IN ('access', 'refresh')),
+  client_id TEXT NOT NULL,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  scopes TEXT NOT NULL,
+  resource TEXT,
+  expires_at TIMESTAMPTZ NOT NULL,
+  revoked_at TIMESTAMPTZ
+);
+
 CREATE TABLE IF NOT EXISTS stores (
   id TEXT PRIMARY KEY,
   owner_id TEXT NOT NULL REFERENCES users(id),

@@ -82,6 +82,12 @@ spec:
             - name: OPENAI_BASE_URL
               value: {{ .Values.openaiBaseUrl | quote }}
             {{- end }}
+            - name: PUBLIC_URL
+              value: {{ .Values.publicUrl | quote }}
+            {{- if hasPrefix "http://" .Values.publicUrl }}
+            - name: MCP_DANGEROUSLY_ALLOW_INSECURE_ISSUER_URL
+              value: "true"
+            {{- end }}
             - name: COOKIE_SECURE
               value: {{ .Values.cookieSecure | quote }}
             - name: ALLOW_CLUSTER_URLS

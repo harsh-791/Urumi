@@ -17,7 +17,10 @@ export function LoginPage() {
           setError("");
           api
             .login(email, password)
-            .then(() => navigate("/servers"))
+            .then(() => {
+              const next = new URLSearchParams(window.location.search).get("next") ?? "";
+              navigate(next.startsWith("/") && !next.startsWith("//") ? next : "/servers");
+            })
             .catch((err: Error) => setError(err.message));
         }}
       >

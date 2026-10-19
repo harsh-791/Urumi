@@ -14,6 +14,8 @@ import {
   login,
   logout,
   me,
+  oauthDecision,
+  oauthRequest,
   revokeKey,
   seedAdmin,
   seedServers,
@@ -24,7 +26,9 @@ import { config } from "./config.js";
 import { migrate, pool, waitForDb } from "./db.js";
 import { HttpError } from "./errors.js";
 import { closeMcpSessions, handleMcp } from "./mcp.js";
+import { bindOAuthStore, createOAuthProvider, createPgOAuthStore, installOAuth, mcpBearer } from "./oauth.js";
 import { closeUpstreams, probeServers } from "./upstream.js";
+import type { RequestHandler } from "express";
 
 const app = express();
 app.disable("x-powered-by");
@@ -70,14 +74,22 @@ app.post("/api/stores", route(createStore));
 app.post("/api/stores/:id/retry", route(retryStore));
 app.delete("/api/stores/:id", route(deleteStore));
 app.post("/api/chat", route(chat));
+app.get("/api/oauth/requests/:id", route(oauthRequest));
+app.post("/api/oauth/decision", route(oauthDecision));
 
-app.post("/mcp", (req, res, next) => {
+let mcpAuth: RequestHandler = (_req, _res, next) => next();
+
+function guardMcp(req: express.Request, res: express.Response, next: express.NextFunction): void {
+  mcpAuth(req, res, next);
+}
+
+app.post("/mcp", guardMcp, (req, res, next) => {
   handleMcp(req, res).catch(next);
 });
-app.get("/mcp", (req, res, next) => {
+app.get("/mcp", guardMcp, (req, res, next) => {
   handleMcp(req, res).catch(next);
 });
-app.delete("/mcp", (req, res, next) => {
+app.delete("/mcp", guardMcp, (req, res, next) => {
   handleMcp(req, res).catch(next);
 });
 
@@ -97,6 +109,13 @@ async function main(): Promise<void> {
   await migrate();
   await seedAdmin();
   await seedServers();
+  if (config.publicUrl) {
+    const store = createPgOAuthStore(pool, config.credentialKey);
+    bindOAuthStore(store);
+    const provider = createOAuthProvider(store, { publicUrl: config.publicUrl });
+    installOAuth(app, provider, config.publicUrl);
+    mcpAuth = mcpBearer(provider, config.publicUrl);
+  }
   const server = app.listen(config.port, () => {
     console.log(`gateway listening on ${config.port}`);
   });
