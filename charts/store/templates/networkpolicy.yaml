@@ -94,9 +94,18 @@ spec:
   policyTypes: ["Ingress", "Egress"]
   ingress:
     - from:
+        {{- if .Values.platformNamespace }}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.platformNamespace }}
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: gateway
+        {{- else }}
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: gateway
+        {{- end }}
       ports:
         - protocol: TCP
           port: 8080

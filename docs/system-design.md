@@ -36,6 +36,16 @@ Downstream MCP sessions live in memory on the gateway, keyed by `Mcp-Session-Id`
 
 Images are pinned by tag in the values file. A release is `helm upgrade urumi charts/urumi -n urumi -f values-prod.yaml -f secrets.prod.yaml`. Helm keeps the previous release. `helm rollback urumi -n urumi` restores the previous manifests. WordPress and MariaDB use `Recreate` because the volumes are ReadWriteOnce. The bootstrap Job is idempotent: it skips `wp core install`, plugin install, API key insert, and the sample product when they already exist. Take a volume snapshot before a WordPress image bump. Rolling back the chart does not roll back a migration that already wrote to the database.
 
+## Multi-store provisioning
+
+The dashboard Stores page inserts a row and returns immediately. A separate provisioner deployment, using the gateway image plus the Helm binary, polls that table. For each new store it creates namespace `st-{slug}`, a ResourceQuota and LimitRange, then `helm upgrade --install` of `charts/store`. The storefront host is `{slug}.{hostSuffix}`. When the release is ready, the provisioner registers `http://woo-mcp.st-{slug}.svc.cluster.local:8080/mcp` under that slug, so tools are `linen__list_orders` rather than a second `woo__list_orders`.
+
+Several stores run at once, up to three Helm installs in parallel. Each user can own three stores. A store still marked provisioning after 12 minutes is marked failed with a reason, and Retry starts a new attempt. Helm install is safe to run again. If the provisioner pod restarts mid-install, the next poll continues the same release, or marks it failed once the timeout has passed. Delete uninstalls the release, deletes the namespace (which removes volumes and Secrets), and removes the MCP server row.
+
+Each store's NetworkPolicy only allows its own WooCommerce MCP pod to reach its own WordPress Service. MariaDB accepts connections only from WordPress and the bootstrap Job in that namespace. A pod in `st-linen` is not selected by the policies in `st-wool`.
+
+The provisioner is the only workload with a service account token. Its ClusterRole can manage the namespaced resources the store chart installs, not the whole cluster API.
+
 ## What this does not do yet
 
-Multi-store provisioning, OAuth for MCP clients, deploying an MCP server from a container image, and more than one gateway replica are out of scope until the definition of done is rehearsed on a cluster.
+OAuth for MCP clients, deploying an MCP server from a container image, and more than one gateway replica are not built.

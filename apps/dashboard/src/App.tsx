@@ -7,6 +7,7 @@ import { ChatPage } from "./pages/Chat";
 import { KeysPage } from "./pages/Keys";
 import { LoginPage } from "./pages/Login";
 import { ServersPage } from "./pages/Servers";
+import { StoresPage } from "./pages/Stores";
 import { TeamPage } from "./pages/Team";
 
 export const UserContext = createContext<User | null>(null);
@@ -18,6 +19,7 @@ export function App() {
       <Route element={<Shell />}>
         <Route path="/" element={<Navigate to="/servers" replace />} />
         <Route path="/servers" element={<ServersPage />} />
+        <Route path="/stores" element={<StoresPage />} />
         <Route path="/team" element={<TeamPage />} />
         <Route path="/keys" element={<KeysPage />} />
         <Route path="/audit" element={<AuditPage />} />

@@ -44,6 +44,18 @@ export type AuditEvent = {
 
 export type ChatToolTrace = { name: string; ok: boolean; preview: string };
 
+export type Store = {
+  id: string;
+  slug: string;
+  name: string;
+  namespace: string;
+  url: string;
+  status: "provisioning" | "ready" | "failed" | "deleting";
+  statusDetail: string | null;
+  ownerEmail: string;
+  createdAt: string;
+};
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     ...init,
@@ -80,6 +92,11 @@ export const api = {
     }),
   revokeKey: (id: string) => request(`/api/keys/${id}/revoke`, { method: "POST" }),
   audit: () => request<{ events: AuditEvent[] }>("/api/audit"),
+  stores: () => request<{ stores: Store[] }>("/api/stores"),
+  createStore: (input: { name: string; slug: string }) =>
+    request("/api/stores", { method: "POST", body: JSON.stringify(input) }),
+  retryStore: (id: string) => request(`/api/stores/${id}/retry`, { method: "POST" }),
+  deleteStore: (id: string) => request(`/api/stores/${id}`, { method: "DELETE" }),
   chat: (messages: { role: "user" | "assistant"; content: string }[]) =>
     request<{ message: string; toolCalls: ChatToolTrace[] }>("/api/chat", {
       method: "POST",

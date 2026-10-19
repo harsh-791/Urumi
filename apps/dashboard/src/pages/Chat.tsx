@@ -7,6 +7,18 @@ type Turn = {
   toolCalls?: ChatToolTrace[];
 };
 
+function plainReply(text: string): string {
+  return text
+    .replace(/\s+---\s+/g, "\n\n")
+    .replace(/\s+#{1,6}\s+/g, "\n\n")
+    .replace(/\*\*/g, "")
+    .replace(/^#{1,6}\s*/gm, "")
+    .replace(/\s+(\d+\.\s+)/g, "\n$1")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 export function ChatPage() {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [draft, setDraft] = useState("");
@@ -38,7 +50,7 @@ export function ChatPage() {
       <div className="chat-log">
         {turns.map((turn, index) => (
           <div key={index} className={`bubble ${turn.role}`}>
-            <div>{turn.content}</div>
+            <div className="reply">{turn.role === "assistant" ? plainReply(turn.content) : turn.content}</div>
             {turn.toolCalls && turn.toolCalls.length > 0 && (
               <div className="trace">
                 {turn.toolCalls.map((call, callIndex) => (

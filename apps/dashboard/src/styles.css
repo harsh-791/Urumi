@@ -131,6 +131,7 @@ textarea { min-height: 72px; resize: vertical; }
 .bubble { max-width: 720px; padding: 12px 14px; border-radius: 10px; }
 .bubble.user { margin-left: auto; background: #1c1916; color: #f6f3ec; }
 .bubble.assistant { background: #f6f3ec; border: 1px solid #d9d1c5; }
+.reply { white-space: pre-wrap; }
 .trace { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
 .trace span { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 12px; color: #6e675e; }
 .bubble.user .trace span { color: #d9d1c5; }

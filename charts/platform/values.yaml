@@ -30,6 +30,12 @@ clockMcp:
   repository: urumi-clock-mcp
   tag: local
   pullPolicy: IfNotPresent
+stores:
+  maxPerUser: 3
+  hostSuffix: 127.0.0.1.sslip.io
+  storageClass: standard
+  wooMcpRepository: urumi-woo-mcp
+  wooMcpTag: local
 networkPolicy: true
 adminEmail: admin@urumi.local
 secrets:

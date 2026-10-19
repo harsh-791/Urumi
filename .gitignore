@@ -11,3 +11,4 @@ coverage/
 .env.*
 private/
 .cursor/mcp.json
+apps/gateway/chart/

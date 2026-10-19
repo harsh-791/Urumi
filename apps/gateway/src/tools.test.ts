@@ -12,6 +12,7 @@ test("members cannot call WooCommerce writes", () => {
   assert.equal(toolAllowed("member", "woo__list_orders"), true);
   assert.equal(toolAllowed("member", "woo__create_product"), false);
   assert.equal(toolAllowed("member", "woo__update_order_status"), false);
+  assert.equal(toolAllowed("member", "linen__create_product"), false);
   assert.equal(toolAllowed("member", "notes__create_note"), true);
   assert.equal(toolAllowed("admin", "woo__create_product"), true);
 });

@@ -94,6 +94,21 @@ CREATE TABLE IF NOT EXISTS audit_log (
 
 CREATE INDEX IF NOT EXISTS audit_log_started_at_idx ON audit_log (started_at DESC);
 CREATE INDEX IF NOT EXISTS api_keys_hash_idx ON api_keys (key_hash);
+
+CREATE TABLE IF NOT EXISTS stores (
+  id TEXT PRIMARY KEY,
+  owner_id TEXT NOT NULL REFERENCES users(id),
+  slug TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  namespace TEXT NOT NULL UNIQUE,
+  url TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('provisioning', 'ready', 'failed', 'deleting')),
+  status_detail TEXT,
+  mcp_server_id TEXT,
+  attempt_started_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 `;
 
 export async function migrate(): Promise<void> {

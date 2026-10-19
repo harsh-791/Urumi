@@ -19,6 +19,7 @@ import {
   seedServers,
   updateServer,
 } from "./api.js";
+import { createStore, deleteStore, listStores, retryStore } from "./stores.js";
 import { config } from "./config.js";
 import { migrate, pool, waitForDb } from "./db.js";
 import { HttpError } from "./errors.js";
@@ -64,6 +65,10 @@ app.get("/api/keys", route(listKeys));
 app.post("/api/keys", route(createKey));
 app.post("/api/keys/:id/revoke", route(revokeKey));
 app.get("/api/audit", route(listAudit));
+app.get("/api/stores", route(listStores));
+app.post("/api/stores", route(createStore));
+app.post("/api/stores/:id/retry", route(retryStore));
+app.delete("/api/stores/:id", route(deleteStore));
 app.post("/api/chat", route(chat));
 
 app.post("/mcp", (req, res, next) => {

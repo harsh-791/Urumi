@@ -30,7 +30,7 @@ export function toolAllowed(role: "admin" | "member", prefixedName: string): boo
   if (role === "admin") return true;
   const parsed = splitTool(prefixedName);
   if (!parsed) return false;
-  if (parsed.slug === "woo" && WRITE_TOOLS.has(parsed.name)) return false;
+  if (WRITE_TOOLS.has(parsed.name)) return false;
   return true;
 }
 

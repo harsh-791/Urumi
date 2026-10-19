@@ -24,6 +24,7 @@ export function Shell() {
           </div>
           <nav>
             <NavLink to="/servers">Servers</NavLink>
+            <NavLink to="/stores">Stores</NavLink>
             {user.role === "admin" && <NavLink to="/team">Team</NavLink>}
             <NavLink to="/keys">API keys</NavLink>
             <NavLink to="/audit">Audit</NavLink>

@@ -23,6 +23,7 @@ ingress:
   tls: false
   tlsSecret: store-tls
 networkPolicy: true
+platformNamespace: ""
 secrets:
   create: false
   name: store-secrets

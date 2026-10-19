@@ -31,6 +31,12 @@ platform:
   allowClusterUrls: true
   openaiModel: gemini-3.5-flash
   openaiBaseUrl: https://generativelanguage.googleapis.com/v1beta/openai/
+  stores:
+    maxPerUser: 3
+    hostSuffix: 127.0.0.1.sslip.io
+    storageClass: standard
+    wooMcpRepository: urumi-woo-mcp
+    wooMcpTag: local
   adminEmail: admin@urumi.local
   ingress:
     className: nginx
