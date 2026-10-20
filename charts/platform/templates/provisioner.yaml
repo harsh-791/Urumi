@@ -118,6 +118,8 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+            - name: HOSTED_PULL_POLICY
+              value: {{ .Values.gateway.pullPolicy | quote }}
             - name: WOO_MCP_REPOSITORY
               value: {{ .Values.stores.wooMcpRepository | quote }}
             - name: WOO_MCP_TAG

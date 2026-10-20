@@ -63,6 +63,9 @@ spec:
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: clock-mcp
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: hosted-mcp
       ports:
         - protocol: TCP
           port: 8080

@@ -52,6 +52,10 @@ An external client can still send `Authorization: Bearer urk_...`. It can also u
 
 Local `publicUrl` is `http://`, so the chart sets `MCP_DANGEROUSLY_ALLOW_INSECURE_ISSUER_URL` only in that case. Production `publicUrl` is `https://` and does not set the flag.
 
+## Hosted MCP servers
+
+An admin can register a server with a container image instead of a URL. The image must listen on port 8080, serve `/mcp`, `/healthz`, and `/readyz`, and run as user 1000. The provisioner creates a Deployment, Service, and NetworkPolicy named `hosted-{slug}` in the platform namespace. The gateway calls `http://hosted-{slug}.{namespace}.svc.cluster.local:8080/mcp`. The pod has no service account token. Only the gateway may connect to it, and its egress is DNS plus public HTTPS. Removing the server deletes those objects and the registry row.
+
 ## What this does not do yet
 
-Deploying an MCP server from a container image, more than one gateway replica, and a tool-search layer are not built.
+More than one gateway replica and a tool-search layer are not built.

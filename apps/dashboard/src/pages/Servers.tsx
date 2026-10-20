@@ -6,6 +6,7 @@ const empty = {
   slug: "",
   name: "",
   url: "",
+  image: "",
   authType: "bearer",
   authHeaderName: "",
   credential: "",
@@ -53,6 +54,7 @@ export function ServersPage() {
                   <td>
                     <strong>{server.name}</strong>
                     <div className="mono">{server.slug}</div>
+                    {admin && server.image && <div className="mono">{server.image}</div>}
                     {admin && server.url && <div className="mono">{server.url}</div>}
                     <div>{server.hasCredential ? `Credential stored (${server.authType})` : "No upstream credential"}</div>
                   </td>
@@ -141,7 +143,19 @@ export function ServersPage() {
             </label>
             <label>
               URL
-              <input value={form.url} onChange={(event) => setForm({ ...form, url: event.target.value })} required />
+              <input
+                value={form.url}
+                placeholder="Leave empty when you supply an image"
+                onChange={(event) => setForm({ ...form, url: event.target.value })}
+              />
+            </label>
+            <label>
+              Image
+              <input
+                value={form.image}
+                placeholder="urumi-clock-mcp:local"
+                onChange={(event) => setForm({ ...form, image: event.target.value })}
+              />
             </label>
             <label>
               Credential

@@ -98,11 +98,42 @@ export async function waitForDeployments(namespace: string, names: string[], tim
   throw new Error(`store pods did not become ready in ${namespace}`);
 }
 
-async function deploymentReady(namespace: string, name: string): Promise<boolean> {
+export async function deploymentReady(namespace: string, name: string): Promise<boolean> {
   const got = await k8s("GET", `/apis/apps/v1/namespaces/${namespace}/deployments/${name}`);
   if (got.status !== 200) return false;
   const body = JSON.parse(got.body) as { status?: { readyReplicas?: number } };
   return (body.status?.readyReplicas ?? 0) >= 1;
+}
+
+export async function upsertResource(
+  apiPrefix: string,
+  namespace: string,
+  plural: string,
+  body: { metadata: { name: string; resourceVersion?: string } },
+): Promise<void> {
+  const path = `${apiPrefix}/namespaces/${namespace}/${plural}`;
+  const created = await k8s("POST", path, body);
+  if (created.status === 201) return;
+  if (created.status !== 409) {
+    throw new Error(`${plural} ${body.metadata.name}: ${created.status} ${created.body.slice(0, 300)}`);
+  }
+  const current = await k8s("GET", `${path}/${body.metadata.name}`);
+  if (current.status !== 200) {
+    throw new Error(`${plural} ${body.metadata.name}: ${current.status} ${current.body.slice(0, 300)}`);
+  }
+  const existing = JSON.parse(current.body) as { metadata?: { resourceVersion?: string } };
+  body.metadata.resourceVersion = existing.metadata?.resourceVersion;
+  const replaced = await k8s("PUT", `${path}/${body.metadata.name}`, body);
+  if (replaced.status !== 200) {
+    throw new Error(`${plural} ${body.metadata.name}: ${replaced.status} ${replaced.body.slice(0, 300)}`);
+  }
+}
+
+export async function deleteResource(apiPrefix: string, namespace: string, plural: string, name: string): Promise<void> {
+  const result = await k8s("DELETE", `${apiPrefix}/namespaces/${namespace}/${plural}/${name}`);
+  if (result.status !== 200 && result.status !== 202 && result.status !== 404) {
+    throw new Error(`delete ${plural} ${name}: ${result.status} ${result.body.slice(0, 300)}`);
+  }
 }
 
 export async function deleteNamespace(name: string): Promise<void> {

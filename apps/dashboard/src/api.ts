@@ -12,6 +12,8 @@ export type McpServer = {
   authType: "none" | "bearer" | "header";
   authHeaderName: string | null;
   hasCredential: boolean;
+  image: string | null;
+  hostState: string | null;
   enabled: boolean;
   status: string;
   statusDetail: string | null;

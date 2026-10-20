@@ -82,6 +82,10 @@ spec:
             - name: OPENAI_BASE_URL
               value: {{ .Values.openaiBaseUrl | quote }}
             {{- end }}
+            - name: STORE_PLATFORM_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
             - name: PUBLIC_URL
               value: {{ .Values.publicUrl | quote }}
             {{- if hasPrefix "http://" .Values.publicUrl }}

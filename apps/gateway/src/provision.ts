@@ -8,6 +8,7 @@ import { config } from "./config.js";
 import { encryptString } from "./crypto.js";
 import { migrate, pool, waitForDb } from "./db.js";
 import { deleteNamespace, deletePendingHelmSecrets, ensureNamespace, ensureQuota, waitForDeployments } from "./k8s.js";
+import { reconcileHosted } from "./hosted.js";
 import { mcpUrl, timedOut } from "./storeplan.js";
 
 const execFileAsync = promisify(execFile);
@@ -185,6 +186,7 @@ async function main(): Promise<void> {
   console.log("provisioner watching stores");
   const run = () => {
     tick().catch((error) => console.error("provision tick failed", error));
+    reconcileHosted().catch((error) => console.error("hosted tick failed", error));
   };
   run();
   const timer = setInterval(run, config.stores.pollMs);

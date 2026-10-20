@@ -8,6 +8,7 @@ import { assertUrlAllowed, SsrfError } from "./ssrf.js";
 import { toolAllowed, validSlug } from "./tools.js";
 import { listUpstreamTools, probeServers } from "./upstream.js";
 import { runChat, type ChatMessage } from "./chat.js";
+import { hostedUrl, validImage } from "./hostedplan.js";
 import { decideAuthorization, describeRequest, requireOAuthStore } from "./oauth.js";
 
 const COOKIE = "urumi_session";
@@ -78,6 +79,8 @@ function publicServer(row: McpServerRow, role: Role, tools: { name: string; desc
     authType: row.auth_type,
     authHeaderName: row.auth_header_name,
     hasCredential: Boolean(row.credential_ciphertext),
+    image: row.image,
+    hostState: row.host_state,
     enabled: row.enabled,
     status: row.status,
     statusDetail: row.status_detail,
@@ -141,23 +144,35 @@ export async function createServer(req: Request, res: Response): Promise<void> {
   requireAdmin(req);
   const slug = String(req.body?.slug ?? "").trim();
   const name = String(req.body?.name ?? "").trim();
-  const url = String(req.body?.url ?? "").trim();
+  const image = String(req.body?.image ?? "").trim();
+  let url = String(req.body?.url ?? "").trim();
   const authType = String(req.body?.authType ?? "none");
   const authHeaderName = optionalString(req.body?.authHeaderName);
   const credential = optionalString(req.body?.credential);
   if (!validSlug(slug)) throw new HttpError(400, "Slug must be a short lowercase name");
   if (!name) throw new HttpError(400, "Name is required");
+  if (image && url) throw new HttpError(400, "Provide a URL or an image, not both");
+  if (!image && !url) throw new HttpError(400, "A URL or an image is required");
+  if (image && !validImage(image)) throw new HttpError(400, "Image must be a name and a tag, like urumi-clock-mcp:local");
   if (authType !== "none" && authType !== "bearer" && authType !== "header") {
     throw new HttpError(400, "authType must be none, bearer, or header");
   }
   if (authType === "header" && !authHeaderName) throw new HttpError(400, "Header name is required");
-  await checkUrl(url);
+  let hostState: string | null = null;
+  let status = "unknown";
+  if (image) {
+    url = hostedUrl(slug, config.stores.platformNamespace || "urumi");
+    hostState = "pending";
+    status = "provisioning";
+  } else {
+    await checkUrl(url);
+  }
   try {
     await pool.query(
       `INSERT INTO mcp_servers
-        (id, slug, name, url, auth_type, auth_header_name, credential_ciphertext, enabled, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, true, 'unknown')`,
-      [randomUUID(), slug, name, url, authType, authHeaderName, seal(authType, credential)],
+        (id, slug, name, url, auth_type, auth_header_name, credential_ciphertext, enabled, status, image, host_state)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, true, $8, $9, $10)`,
+      [randomUUID(), slug, name, url, authType, authHeaderName, seal(authType, credential), status, image || null, hostState],
     );
   } catch (error) {
     if (isUnique(error)) throw new HttpError(409, "That slug is already registered");
@@ -174,7 +189,7 @@ export async function updateServer(req: Request, res: Response): Promise<void> {
   if (!row) throw new HttpError(404, "Server not found");
 
   const name = req.body?.name !== undefined ? String(req.body.name).trim() : row.name;
-  const url = req.body?.url !== undefined ? String(req.body.url).trim() : row.url;
+  const url = row.image ? row.url : req.body?.url !== undefined ? String(req.body.url).trim() : row.url;
   const authType = req.body?.authType !== undefined ? String(req.body.authType) : row.auth_type;
   const enabled = req.body?.enabled !== undefined ? Boolean(req.body.enabled) : row.enabled;
   const authHeaderName =
@@ -183,11 +198,11 @@ export async function updateServer(req: Request, res: Response): Promise<void> {
   if (authType !== "none" && authType !== "bearer" && authType !== "header") {
     throw new HttpError(400, "authType must be none, bearer, or header");
   }
-  await checkUrl(url);
+  if (!row.image) await checkUrl(url);
   let ciphertext = row.credential_ciphertext;
   if (authType === "none") ciphertext = null;
   if (req.body?.credential) ciphertext = seal(authType, String(req.body.credential));
-  const status = enabled ? "unknown" : "disabled";
+  const status = !enabled ? "disabled" : row.host_state === "pending" ? row.status : "unknown";
   await pool.query(
     `UPDATE mcp_servers
      SET name = $2, url = $3, auth_type = $4, auth_header_name = $5,
@@ -201,8 +216,18 @@ export async function updateServer(req: Request, res: Response): Promise<void> {
 
 export async function deleteServer(req: Request, res: Response): Promise<void> {
   requireAdmin(req);
-  const result = await pool.query("DELETE FROM mcp_servers WHERE id = $1", [req.params.id]);
-  if (result.rowCount === 0) throw new HttpError(404, "Server not found");
+  const current = await pool.query<McpServerRow>("SELECT * FROM mcp_servers WHERE id = $1", [req.params.id]);
+  const row = current.rows[0];
+  if (!row) throw new HttpError(404, "Server not found");
+  if (row.image) {
+    await pool.query(
+      `UPDATE mcp_servers SET host_state = 'deleting', enabled = false, status = 'deleting', updated_at = now() WHERE id = $1`,
+      [row.id],
+    );
+    res.status(202).json({ ok: true });
+    return;
+  }
+  await pool.query("DELETE FROM mcp_servers WHERE id = $1", [row.id]);
   res.json({ ok: true });
 }
 

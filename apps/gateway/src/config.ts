@@ -48,6 +48,7 @@ export const config = {
     wooTag: process.env.WOO_MCP_TAG ?? "local",
     pollMs: Number(process.env.STORE_POLL_MS ?? 5000),
   },
+  hostedPullPolicy: process.env.HOSTED_PULL_POLICY ?? "IfNotPresent",
   seed: {
     wooUrl: process.env.WOO_MCP_URL ?? "",
     wooToken: process.env.WOO_MCP_TOKEN ?? "",

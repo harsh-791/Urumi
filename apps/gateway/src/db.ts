@@ -33,6 +33,8 @@ export type McpServerRow = {
   status: string;
   status_detail: string | null;
   last_checked_at: Date | null;
+  image: string | null;
+  host_state: string | null;
   created_at: Date;
   updated_at: Date;
 };
@@ -76,6 +78,8 @@ CREATE TABLE IF NOT EXISTS mcp_servers (
   status TEXT NOT NULL DEFAULT 'unknown',
   status_detail TEXT,
   last_checked_at TIMESTAMPTZ,
+  image TEXT,
+  host_state TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -155,6 +159,8 @@ CREATE TABLE IF NOT EXISTS stores (
 
 export async function migrate(): Promise<void> {
   await pool.query(SCHEMA);
+  await pool.query("ALTER TABLE mcp_servers ADD COLUMN IF NOT EXISTS image TEXT");
+  await pool.query("ALTER TABLE mcp_servers ADD COLUMN IF NOT EXISTS host_state TEXT");
 }
 
 export async function waitForDb(): Promise<void> {

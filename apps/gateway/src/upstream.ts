@@ -182,6 +182,7 @@ export async function probeServers(): Promise<void> {
   const result = await pool.query<McpServerRow>("SELECT * FROM mcp_servers ORDER BY created_at ASC");
   await Promise.all(
     result.rows.map(async (server) => {
+      if (server.host_state === "pending" || server.host_state === "deleting") return;
       if (!server.enabled) {
         await pool.query(
           `UPDATE mcp_servers SET status = 'disabled', status_detail = NULL, last_checked_at = now(), updated_at = now() WHERE id = $1`,
