@@ -1,3 +1,10 @@
+function intEnv(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : fallback;
+}
+
 function required(name: string): string {
   const value = process.env[name];
   if (!value) throw new Error(`Missing required env ${name}`);
@@ -33,6 +40,8 @@ export const config = {
   listTimeoutMs: Number(process.env.LIST_TIMEOUT_MS ?? 3000),
   callTimeoutMs: Number(process.env.CALL_TIMEOUT_MS ?? 20000),
   probeIntervalMs: Number(process.env.PROBE_INTERVAL_MS ?? 15000),
+  toolDirectLimit: intEnv("TOOL_DIRECT_LIMIT", 24),
+  rateLimitPerMinute: intEnv("RATE_LIMIT_PER_MINUTE", 60),
   stores: {
     maxPerUser: Number(process.env.STORE_MAX_PER_USER ?? 3),
     timeoutMs: Number(process.env.STORE_TIMEOUT_MS ?? 12 * 60 * 1000),

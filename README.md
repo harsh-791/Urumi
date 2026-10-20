@@ -169,7 +169,7 @@ npm test --prefix apps/gateway
 npm run build
 ```
 
-Gateway tests cover password hashing, credential encryption, the SSRF rules, tool prefixes, the member write restriction, and a listing where one upstream hangs.
+Gateway tests cover password hashing, credential encryption, the SSRF rules, tool prefixes, the member write restriction, a listing where one upstream hangs, tool search, the catalog switch, and the rate-limit window.
 
 ## Beyond the core
 
@@ -183,5 +183,9 @@ Implemented and where to look:
 - Multi-store provisioning: dashboard **Stores**, provisioner in `charts/platform/templates/provisioner.yaml`, reconcile loop in `apps/gateway/src/provision.ts`. See the system design note.
 - OAuth for MCP clients: `apps/gateway/src/oauth.ts` and the dashboard consent page at `/oauth/consent`. API keys still work.
 - Hosted MCP servers: on **Servers**, leave the URL empty and set an image such as `urumi-clock-mcp:local`. The provisioner runs it. See `apps/gateway/src/hosted.ts`.
+- Tool catalog: dashboard chat searches with `search_tools` and runs one tool with `call_tool` (`apps/gateway/src/catalog.ts`). MCP clients still receive the full list until it passes 24 tools.
+- Two gateway replicas, with stateless MCP so a call can land on either pod: `gateway.replicas` in the values files.
+- Per-user rate limit, shared in Postgres: `RATE_LIMIT_PER_MINUTE`, default 60.
+- Call count, error rate, and average latency per server: the Audit page, and `GET /metrics` on a gateway pod.
 
-Not implemented: multiple gateway replicas and a tool-search layer. The session limit is described in the design note.
+Not implemented: a live VPS install. `values-prod.yaml` is the template for that.

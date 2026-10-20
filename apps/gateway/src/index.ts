@@ -7,6 +7,7 @@ import {
   deleteServer,
   deleteUser,
   listAudit,
+  listMetrics,
   listKeys,
   listServers,
   listUsers,
@@ -27,6 +28,7 @@ import { migrate, pool, waitForDb } from "./db.js";
 import { HttpError } from "./errors.js";
 import { closeMcpSessions, handleMcp } from "./mcp.js";
 import { bindOAuthStore, createOAuthProvider, createPgOAuthStore, installOAuth, mcpBearer } from "./oauth.js";
+import { renderMetrics } from "./metrics.js";
 import { closeUpstreams, probeServers } from "./upstream.js";
 import type { RequestHandler } from "express";
 
@@ -36,6 +38,10 @@ app.use(express.json({ limit: "1mb" }));
 
 app.get("/healthz", (_req, res) => {
   res.json({ ok: true });
+});
+
+app.get("/metrics", (_req, res) => {
+  res.type("text/plain; version=0.0.4; charset=utf-8").send(renderMetrics());
 });
 
 app.get("/readyz", async (_req, res) => {
@@ -69,6 +75,7 @@ app.get("/api/keys", route(listKeys));
 app.post("/api/keys", route(createKey));
 app.post("/api/keys/:id/revoke", route(revokeKey));
 app.get("/api/audit", route(listAudit));
+app.get("/api/metrics", route(listMetrics));
 app.get("/api/stores", route(listStores));
 app.post("/api/stores", route(createStore));
 app.post("/api/stores/:id/retry", route(retryStore));

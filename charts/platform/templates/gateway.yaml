@@ -21,7 +21,7 @@ metadata:
     {{- include "platform.labels" . | nindent 4 }}
     app.kubernetes.io/name: gateway
 spec:
-  replicas: 1
+  replicas: {{ .Values.gateway.replicas }}
   selector:
     matchLabels:
       app.kubernetes.io/name: gateway
@@ -96,6 +96,10 @@ spec:
               value: {{ .Values.cookieSecure | quote }}
             - name: ALLOW_CLUSTER_URLS
               value: {{ .Values.allowClusterUrls | quote }}
+            - name: TOOL_DIRECT_LIMIT
+              value: {{ .Values.gateway.toolDirectLimit | quote }}
+            - name: RATE_LIMIT_PER_MINUTE
+              value: {{ .Values.gateway.rateLimitPerMinute | quote }}
             - name: WOO_MCP_URL
               value: http://woo-mcp.{{ .Release.Namespace }}.svc.cluster.local:8080/mcp
             - name: NOTES_MCP_URL

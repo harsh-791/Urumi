@@ -33,6 +33,8 @@ export type ApiKey = {
   user_id: string;
 };
 
+export type ServerMetric = { server: string; calls: number; errors: number; avgMs: number };
+
 export type AuditEvent = {
   id: string;
   user_email: string;
@@ -94,6 +96,7 @@ export const api = {
     }),
   revokeKey: (id: string) => request(`/api/keys/${id}/revoke`, { method: "POST" }),
   audit: () => request<{ events: AuditEvent[] }>("/api/audit"),
+  metrics: () => request<{ servers: ServerMetric[] }>("/api/metrics"),
   stores: () => request<{ stores: Store[] }>("/api/stores"),
   createStore: (input: { name: string; slug: string }) =>
     request("/api/stores", { method: "POST", body: JSON.stringify(input) }),

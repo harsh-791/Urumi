@@ -8,6 +8,7 @@ import { assertUrlAllowed, SsrfError } from "./ssrf.js";
 import { toolAllowed, validSlug } from "./tools.js";
 import { listUpstreamTools, probeServers } from "./upstream.js";
 import { runChat, type ChatMessage } from "./chat.js";
+import { takeRate } from "./rate.js";
 import { hostedUrl, validImage } from "./hostedplan.js";
 import { decideAuthorization, describeRequest, requireOAuthStore } from "./oauth.js";
 
@@ -331,6 +332,30 @@ export async function listAudit(req: Request, res: Response): Promise<void> {
   res.json({ events: result.rows });
 }
 
+export async function listMetrics(req: Request, res: Response): Promise<void> {
+  const user = requireUser(req);
+  const result = await pool.query<{ server: string | null; calls: string; errors: string; avg_ms: string }>(
+    `SELECT COALESCE(server_slug, 'gateway') AS server,
+            COUNT(*)::text AS calls,
+            COUNT(*) FILTER (WHERE outcome = 'error')::text AS errors,
+            COALESCE(ROUND(AVG(duration_ms)), 0)::text AS avg_ms
+     FROM audit_log
+     WHERE started_at > now() - interval '24 hours'
+       AND ($1::text = 'admin' OR user_id = $2)
+     GROUP BY 1
+     ORDER BY 1`,
+    [user.role, user.id],
+  );
+  res.json({
+    servers: result.rows.map((row) => ({
+      server: row.server ?? "gateway",
+      calls: Number(row.calls),
+      errors: Number(row.errors),
+      avgMs: Number(row.avg_ms),
+    })),
+  });
+}
+
 export async function oauthRequest(req: Request, res: Response): Promise<void> {
   requireUser(req);
   const described = await describeRequest(requireOAuthStore(), String(req.params.id ?? ""));
@@ -349,6 +374,12 @@ export async function oauthDecision(req: Request, res: Response): Promise<void> 
 
 export async function chat(req: Request, res: Response): Promise<void> {
   const user = requireUser(req);
+  const allowed = await takeRate(`user:${user.id}`, config.rateLimitPerMinute);
+  if (!allowed) {
+    res.set("Retry-After", "60");
+    res.status(429).json({ error: "Too many requests. Try again in a minute." });
+    return;
+  }
   const messages = normalizeMessages(req.body?.messages);
   try {
     const result = await runChat(user, messages);

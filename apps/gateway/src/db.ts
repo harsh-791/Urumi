@@ -96,6 +96,13 @@ CREATE TABLE IF NOT EXISTS audit_log (
   error_message TEXT
 );
 
+CREATE TABLE IF NOT EXISTS rate_windows (
+  subject TEXT NOT NULL,
+  window_epoch BIGINT NOT NULL,
+  hits INTEGER NOT NULL,
+  PRIMARY KEY (subject, window_epoch)
+);
+
 CREATE INDEX IF NOT EXISTS audit_log_started_at_idx ON audit_log (started_at DESC);
 CREATE INDEX IF NOT EXISTS api_keys_hash_idx ON api_keys (key_hash);
 

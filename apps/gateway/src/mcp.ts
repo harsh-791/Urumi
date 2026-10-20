@@ -1,16 +1,18 @@
-import { randomUUID } from "node:crypto";
 import type { Request, Response } from "express";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { CallToolRequestSchema, isInitializeRequest, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { writeAudit } from "./audit.js";
+import { CALL_TOOL, resolveModelCall, SEARCH_TOOL, toolsForClient } from "./catalog.js";
+import { config } from "./config.js";
 import { hashApiKey } from "./crypto.js";
 import { pool, type UserRow } from "./db.js";
+import { recordToolCall } from "./metrics.js";
 import { userIdForAccessToken } from "./oauth.js";
+import { takeRate } from "./rate.js";
 import { callGatewayTool, visibleTools } from "./upstream.js";
 
-type Session = { transport: StreamableHTTPServerTransport; userId: string };
-const sessions = new Map<string, Session>();
+const live = new Set<StreamableHTTPServerTransport>();
 
 type BearerUser = { id: string; email: string; role: "admin" | "member" };
 
@@ -51,7 +53,7 @@ function buildServer(userId: string): Server {
     const user = await reloadUser(userId);
     if (!user) throw new Error("User no longer exists");
     const { tools } = await visibleTools(user);
-    return { tools };
+    return { tools: toolsForClient(tools, config.toolDirectLimit) };
   });
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const user = await reloadUser(userId);
@@ -59,19 +61,59 @@ function buildServer(userId: string): Server {
     const started = new Date();
     const name = request.params.name;
     const args = (request.params.arguments ?? {}) as Record<string, unknown>;
+    if (name === SEARCH_TOOL || name === CALL_TOOL) {
+      const { tools } = await visibleTools(user);
+      const resolved = resolveModelCall(tools, name, args);
+      if (resolved.kind === "search" || resolved.kind === "error") {
+        const ok = resolved.kind === "search";
+        const text = resolved.kind === "search" ? resolved.text : resolved.message;
+        const durationMs = Date.now() - started.getTime();
+        recordToolCall("gateway", ok ? "success" : "error", durationMs);
+        await writeAudit({
+          userId: user.id,
+          userEmail: user.email,
+          serverSlug: "gateway",
+          toolName: name,
+          startedAt: started,
+          durationMs,
+          outcome: ok ? "success" : "error",
+          errorMessage: ok ? null : text.slice(0, 500),
+        });
+        return { content: [{ type: "text" as const, text }], isError: !ok };
+      }
+      const outcome = await callGatewayTool(user, resolved.name, resolved.arguments);
+      const durationMs = Date.now() - started.getTime();
+      recordToolCall(outcome.serverSlug ?? "gateway", outcome.result.isError ? "error" : "success", durationMs);
+      await writeAudit({
+        userId: user.id,
+        userEmail: user.email,
+        serverSlug: outcome.serverSlug,
+        toolName: resolved.name,
+        startedAt: started,
+        durationMs,
+        outcome: outcome.result.isError ? "error" : "success",
+        errorMessage: outcome.errorMessage,
+      });
+      console.log(
+        `tool ${resolved.name} user=${user.email} outcome=${outcome.result.isError ? "error" : "success"} ${durationMs}ms`,
+      );
+      return outcome.result;
+    }
     const outcome = await callGatewayTool(user, name, args);
+    const durationMs = Date.now() - started.getTime();
+    recordToolCall(outcome.serverSlug ?? "gateway", outcome.result.isError ? "error" : "success", durationMs);
     await writeAudit({
       userId: user.id,
       userEmail: user.email,
       serverSlug: outcome.serverSlug,
       toolName: name,
       startedAt: started,
-      durationMs: Date.now() - started.getTime(),
+      durationMs,
       outcome: outcome.result.isError ? "error" : "success",
       errorMessage: outcome.errorMessage,
     });
     console.log(
-      `tool ${name} user=${user.email} outcome=${outcome.result.isError ? "error" : "success"} ${Date.now() - started.getTime()}ms`,
+      `tool ${name} user=${user.email} outcome=${outcome.result.isError ? "error" : "success"} ${durationMs}ms`,
     );
     return outcome.result;
   });
@@ -88,38 +130,28 @@ export async function handleMcp(req: Request, res: Response): Promise<void> {
     rpcError(res, 401, -32000, "Unauthorized");
     return;
   }
-  const sessionId = req.header("mcp-session-id");
+  if (req.method !== "POST") {
+    res.set("Allow", "POST");
+    rpcError(res, 405, -32000, "Method not allowed");
+    return;
+  }
+  const allowed = await takeRate(`user:${user.id}`, config.rateLimitPerMinute);
+  if (!allowed) {
+    res.set("Retry-After", "60");
+    rpcError(res, 429, -32000, "Too many requests. Try again in a minute.");
+    return;
+  }
+  const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+  const server = buildServer(user.id);
+  live.add(transport);
+  res.on("close", () => {
+    live.delete(transport);
+    void transport.close().catch(() => undefined);
+    void server.close().catch(() => undefined);
+  });
   try {
-    if (sessionId && sessions.has(sessionId)) {
-      const session = sessions.get(sessionId)!;
-      if (session.userId !== user.id) {
-        rpcError(res, 401, -32000, "Session belongs to another user");
-        return;
-      }
-      await session.transport.handleRequest(req, res, req.body);
-      return;
-    }
-    if (!sessionId && req.method === "POST" && isInitializeRequest(req.body)) {
-      let transport: StreamableHTTPServerTransport;
-      transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: () => randomUUID(),
-        onsessioninitialized: (id) => {
-          sessions.set(id, { transport, userId: user.id });
-        },
-      });
-      transport.onclose = () => {
-        if (transport.sessionId) sessions.delete(transport.sessionId);
-      };
-      const server = buildServer(user.id);
-      await server.connect(transport);
-      await transport.handleRequest(req, res, req.body);
-      return;
-    }
-    if (sessionId) {
-      rpcError(res, 404, -32001, "Session not found");
-      return;
-    }
-    rpcError(res, 400, -32000, "Bad Request: session id required");
+    await server.connect(transport);
+    await transport.handleRequest(req, res, req.body);
   } catch (error) {
     console.error("mcp request failed", error);
     if (!res.headersSent) rpcError(res, 500, -32603, "Internal error");
@@ -127,10 +159,6 @@ export async function handleMcp(req: Request, res: Response): Promise<void> {
 }
 
 export async function closeMcpSessions(): Promise<void> {
-  await Promise.all(
-    [...sessions.values()].map(async (session) => {
-      await session.transport.close().catch(() => undefined);
-    }),
-  );
-  sessions.clear();
+  await Promise.all([...live].map((transport) => transport.close().catch(() => undefined)));
+  live.clear();
 }

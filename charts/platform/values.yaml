@@ -18,6 +18,9 @@ gateway:
   repository: urumi-gateway
   tag: local
   pullPolicy: IfNotPresent
+  replicas: 1
+  toolDirectLimit: 24
+  rateLimitPerMinute: 60
 dashboard:
   repository: urumi-dashboard
   tag: local

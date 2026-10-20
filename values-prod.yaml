@@ -53,6 +53,9 @@ platform:
     repository: ghcr.io/OWNER/urumi-gateway
     tag: "0.1.0"
     pullPolicy: IfNotPresent
+    replicas: 2
+    toolDirectLimit: 24
+    rateLimitPerMinute: 60
   dashboard:
     repository: ghcr.io/OWNER/urumi-dashboard
     tag: "0.1.0"

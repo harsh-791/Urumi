@@ -20,7 +20,23 @@ A probe runs every 15 seconds and sets Connected, Unreachable, or Disabled. Disa
 
 ## Sessions and replicas
 
-Downstream MCP sessions live in memory on the gateway, keyed by `Mcp-Session-Id`. The core runs one gateway replica. A second replica would need sticky sessions or a shared session store, because a session created on one process is unknown to the other. That is a deliberate limit, not an accident.
+Downstream MCP requests are stateless. Each `POST /mcp` is handled on its own, and the gateway does not issue an `Mcp-Session-Id`. A client that still sends one is accepted. `GET /mcp` returns 405 because the gateway does not keep a server-push stream. Tool calls are request and response, so a replica restart does not strand a session.
+
+Upstream connections stay in memory on the pod that opened them. Any replica can open its own connection to the same upstream, so a call that lands on the other pod still works. Local and production values run two gateway replicas. The chart default is one.
+
+## Tool catalog
+
+The dashboard chat model never receives the full tool list. It gets `search_tools` and `call_tool`. `search_tools` matches names and descriptions and returns the argument schema. `call_tool` runs the chosen tool through the same permission check as a direct call. A member still cannot create a product or change an order status, including by naming that tool inside `call_tool`.
+
+MCP clients receive every allowed tool while the catalog is at or under `TOOL_DIRECT_LIMIT` (24). Above that, `tools/list` returns only the two catalog tools. A direct `tools/call` by name still works, and it is still rejected when the role is not allowed to use it.
+
+## Rate limits
+
+Each user gets `RATE_LIMIT_PER_MINUTE` requests (default 60) on `POST /mcp` and `POST /api/chat`. The counter is a row in Postgres, so both replicas share the window. The next request in that minute is 429 with `Retry-After: 60`. Set the limit to 0 to turn it off.
+
+## Metrics
+
+`GET /metrics` is Prometheus text for that process: call count, error count, and total duration per server, plus a `urumi_gateway_info` series with the pod name. It is not routed through the public Ingress. The Audit page reads the shared audit log for the last 24 hours, so those totals include every replica.
 
 ## What changes for production
 
@@ -58,4 +74,4 @@ An admin can register a server with a container image instead of a URL. The imag
 
 ## What this does not do yet
 
-More than one gateway replica and a tool-search layer are not built.
+A live VPS or k3s install is not part of this repo. `values-prod.yaml` is the template for that host: real DNS, `local-path` storage, registry images, and TLS. cert-manager is not installed.
