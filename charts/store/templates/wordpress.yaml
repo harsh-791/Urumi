@@ -122,6 +122,10 @@ metadata:
   name: wordpress
   labels:
     {{- include "store.labels" . | nindent 4 }}
+  {{- if .Values.ingress.certManagerIssuer }}
+  annotations:
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.certManagerIssuer | quote }}
+  {{- end }}
 spec:
   ingressClassName: {{ .Values.ingress.className }}
   rules:

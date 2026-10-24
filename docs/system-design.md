@@ -45,12 +45,24 @@ Each user gets `RATE_LIMIT_PER_MINUTE` requests (default 60) on `POST /mcp` and 
 - Ingress hosts and the WordPress site URL become real DNS names. Local uses `sslip.io`, which resolves `store.127.0.0.1.sslip.io` to `127.0.0.1`, so kind's port 80 mapping is enough.
 - `storageClass` moves from kind's `standard` to k3s `local-path`.
 - Image repositories move from local tags (`urumi-gateway:local`, `pullPolicy: IfNotPresent` after `kind load`) to a registry.
-- TLS is a flag on the Ingress plus a secret name. `cookieSecure` is true in the prod file, so turn TLS on before using that file or browsers will drop the session cookie.
+- TLS is a flag on the Ingress plus a secret name. `cookieSecure` is true in the prod file, so turn TLS on before using that file or browsers will drop the session cookie. `ingress.certManagerIssuer` adds the cert-manager annotation. Leave it empty until `deploy/letsencrypt-issuer.yaml` is applied. `scripts/vps-up.sh` installs k3s without Traefik, ingress-nginx, and the chart.
 - Secrets are not in the prod values. Create `store-secrets` and `platform-secrets` with `kubectl`, with the same keys the chart reads. Local installs instead pass a gitignored `secrets.local.yaml` with `secrets.create: true`.
 
 ## Upgrades and rollback
 
-Images are pinned by tag in the values file. A release is `helm upgrade urumi charts/urumi -n urumi -f values-prod.yaml -f secrets.prod.yaml`. Helm keeps the previous release. `helm rollback urumi -n urumi` restores the previous manifests. WordPress and MariaDB use `Recreate` because the volumes are ReadWriteOnce. The bootstrap Job is idempotent: it skips `wp core install`, plugin install, API key insert, and the sample product when they already exist. Take a volume snapshot before a WordPress image bump. Rolling back the chart does not roll back a migration that already wrote to the database.
+Images are pinned by tag in the values file. Helm keeps every release. `helm upgrade` applies the new tag and settings. `helm rollback urumi <revision> -n urumi` restores that revision's manifests, including the image tags. WordPress and MariaDB use `Recreate` because the volumes are ReadWriteOnce, so a store image change replaces the pod and keeps the volume. The bootstrap Job is idempotent: it skips `wp core install`, plugin install, API key insert, and the sample product when they already exist. Take a volume snapshot before a WordPress image bump. Rolling back the chart does not undo a migration that already wrote to the database.
+
+Production install creates the Secrets with kubectl, then:
+
+```sh
+helm upgrade --install urumi charts/urumi -n urumi --create-namespace --timeout 15m -f values-prod.yaml
+helm history urumi -n urumi
+helm rollback urumi -n urumi
+```
+
+Shown on the kind cluster on 20 Oct 2026. Revision 18 was deployed with two gateway replicas and `RATE_LIMIT_PER_MINUTE=60`. An upgrade set that limit to 30 and became revision 19. Both new gateway pods became Ready, and `clock__current_time` returned 200. `helm rollback urumi 18` became revision 20, described as "Rollback to 18". The gateway pods rolled again, the limit was 60, both replicas were Ready, and the same clock call returned 200. The WordPress pod was not recreated. Its shop page stayed up through the gateway rollout.
+
+Both revisions used the tag `urumi-gateway:local`, so this rollback restored the setting and the pod spec. A binary rollback needs the previous tag to still exist in the registry. Pin `0.1.0`, upgrade the values to `0.1.1`, and roll back to the revision that names `0.1.0`.
 
 ## Multi-store provisioning
 

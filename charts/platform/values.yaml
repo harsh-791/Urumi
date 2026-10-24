@@ -12,6 +12,7 @@ ingress:
   controllerLabelValue: ingress-nginx
   tls: false
   tlsSecret: gateway-tls
+  certManagerIssuer: ""
 postgres:
   image: postgres:16-alpine
 gateway:

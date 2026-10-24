@@ -3,6 +3,7 @@ dist/
 *.log
 .DS_Store
 secrets.local.yaml
+secrets.prod.yaml
 apps/dashboard/dist/
 charts/urumi/charts/
 charts/urumi/Chart.lock

@@ -111,46 +111,34 @@ Then, as the admin:
 
 ## Production-like VPS
 
-Install k3s, then install ingress-nginx so the ingress class matches local (`nginx`). k3s ships Traefik. You can use it instead if you change `ingress.className`, `controllerNamespace`, and the controller label in `values-prod.yaml`. The NetworkPolicies that allow the ingress controller depend on those labels.
+`values-prod.yaml` is the only diff from local:
+
+| | Local | VPS |
+| --- | --- | --- |
+| Hosts | `*.127.0.0.1.sslip.io` | Your DNS, `store` and `app` |
+| Storage | kind `standard` | k3s `local-path` |
+| Images | `urumi-*:local`, loaded into kind | A registry, tag `0.1.0` |
+| TLS | Off, `cookieSecure: false` | On, `cookieSecure: true` |
+| Secrets | gitignored `secrets.local.yaml` | gitignored `secrets.prod.yaml`, or Secrets created with kubectl |
+
+k3s ships Traefik. `scripts/vps-up.sh` installs k3s with Traefik disabled and installs ingress-nginx, because the NetworkPolicies allow that controller by namespace and label. Run it on the VPS as root, after the hosts and image names in `values-prod.yaml` are real:
 
 ```sh
-curl -sfL https://get.k3s.io | sh -
-# ingress-nginx: use the cloud or bare-metal manifest from the ingress-nginx docs
+sudo ./scripts/vps-up.sh
 ```
 
-Build the five images, push them, and set `repository` and `tag` in `values-prod.yaml`. Replace `example.com` with your DNS. Point `store` and `app` at the VPS. Storage class `local-path` is the k3s default.
+`WITH_CERT_MANAGER=1 sudo ./scripts/vps-up.sh` also installs cert-manager and `deploy/letsencrypt-issuer.yaml`. Set the email in that file, set `ingress.certManagerIssuer: letsencrypt-prod` on the store and the platform, and run the script again. The ingress annotation asks cert-manager for the certificate. Leave the issuer empty until DNS points at the VPS.
 
-Create the secrets before installing. The keys match the chart:
+Build the five images, push them, and set `repository` and `tag` in `values-prod.yaml`. Point `store` and `app` at the VPS.
+
+On the VPS, generate the gitignored secrets file, then copy it into place. The two WooCommerce MCP tokens in that file match. The credential key decodes to 32 bytes.
 
 ```sh
-kubectl create namespace urumi
-kubectl create secret generic store-secrets -n urumi \
-  --from-literal=db-password=... \
-  --from-literal=db-root-password=... \
-  --from-literal=wp-admin-password=... \
-  --from-literal=wc-consumer-key=ck_... \
-  --from-literal=wc-consumer-secret=cs_... \
-  --from-literal=woo-mcp-token=...
-kubectl create secret generic platform-secrets -n urumi \
-  --from-literal=db-password=... \
-  --from-literal=admin-password=... \
-  --from-literal=credential-key="$(openssl rand -base64 32)" \
-  --from-literal=openai-api-key=sk-... \
-  --from-literal=woo-mcp-token=... \
-  --from-literal=notes-mcp-token=... \
-  --from-literal=clock-mcp-token=...
+OPENAI_API_KEY=sk-... ./scripts/gen-secrets.sh
+cp secrets.local.yaml secrets.prod.yaml
 ```
 
-The two `woo-mcp-token` values must match. `credential-key` must decode to 32 bytes.
-
-For TLS, install cert-manager, point the certificate secrets at `store-tls` and `gateway-tls`, and keep `ingress.tls: true`. `cookieSecure` is already true in the prod file.
-
-```sh
-helm dependency update charts/urumi
-helm upgrade --install urumi charts/urumi \
-  --namespace urumi --create-namespace --timeout 15m \
-  -f values-prod.yaml
-```
+`vps-up.sh` installs from `values-prod.yaml` and `secrets.prod.yaml`. To create the Secrets with kubectl instead, leave `secrets.create` false and do not pass the secrets file. The Secret names are `store-secrets` and `platform-secrets`, with the keys `db-password`, `db-root-password`, `wp-admin-password`, `wc-consumer-key`, `wc-consumer-secret`, `woo-mcp-token`, `admin-password`, `credential-key`, `openai-api-key`, `notes-mcp-token`, and `clock-mcp-token`.
 
 Upgrade and roll back:
 
@@ -159,6 +147,8 @@ helm upgrade urumi charts/urumi -n urumi -f values-prod.yaml
 helm history urumi -n urumi
 helm rollback urumi -n urumi
 ```
+
+On the local cluster this was run for real: revision 19 raised the gateway rate limit to 30, `helm rollback urumi 18` restored 60, and the storefront stayed up. The design note has the pod checks. Pin image tags in the registry when the rollback must restore an older binary. The local tags are all `:local`.
 
 Do not commit secret values. `values-prod.yaml` only names hosts, storage, images, and secret objects.
 

@@ -24,6 +24,8 @@ store:
     controllerLabelValue: ingress-nginx
     tls: true
     tlsSecret: store-tls
+    # Set to letsencrypt-prod after DNS points at this host. Empty skips cert-manager.
+    certManagerIssuer: ""
   networkPolicy: true
 
 platform:
@@ -47,6 +49,7 @@ platform:
     controllerLabelValue: ingress-nginx
     tls: true
     tlsSecret: gateway-tls
+    certManagerIssuer: ""
   postgres:
     image: postgres:16-alpine
   gateway:
